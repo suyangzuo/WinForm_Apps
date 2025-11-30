@@ -2,12 +2,17 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net6.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <RootNamespace>密码生成器_WinForm</RootNamespace>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationIcon>password.ico</ApplicationIcon>
+    <AssemblyName>密码生成器</AssemblyName>
+    <PackageId>密码生成器</PackageId>
+    <Authors>苏扬</Authors>
+    <Company>NTZZ</Company>
+    <Product>密码生成器</Product>
   </PropertyGroup>
 
   <ItemGroup>

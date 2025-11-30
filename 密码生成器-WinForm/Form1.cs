@@ -10,6 +10,25 @@ namespace 密码生成器_WinForm
 
         // container used to keep all main controls centered together
         private System.Windows.Forms.Panel? centerPanel;
+        // copy button for richTbx_Pwd (bottom-right corner)
+        private Sunny.UI.UIButton? btn_CopyPwd;
+        // non-intrusive tooltip used to show copy status
+        private System.Windows.Forms.ToolTip? _copyToolTip;
+        // last tooltip text shown (used for owner-draw sizing)
+        private string? _lastCopyToolTipText;
+        // tooltip background color (customizable)
+        private Color _copyToolTipBackColor = Color.FromArgb(40, 40, 40);
+        // tooltip text color
+        private Color _copyToolTipForeColor = Color.White;
+
+        // Allow changing the copy tooltip colors at runtime
+        public void SetCopyToolTipColors(Color backColor, Color foreColor)
+        {
+            _copyToolTipBackColor = backColor;
+            _copyToolTipForeColor = foreColor;
+            // If tooltip already exists, force a redraw next time it's shown (owner-draw uses these fields)
+            // No direct invalidation required; owner-draw handlers read current colors when drawing.
+        }
 
         public Form1()
         {
@@ -88,7 +107,12 @@ namespace 密码生成器_WinForm
 
             // 将界面控件包装到一个容器中以便在窗体缩放时整体居中
             SetupCentering();
-        }
+
+            // create copy button anchored to the rich text box (bottom-right)
+            CreateRichTextCopyButton();
+            // prevent the rich text box from keeping focus when clicked (remove caret immediately)
+            try { richTbx_Pwd.MouseDown += (s, e) => { RemoveRichFocus(); }; } catch { }
+         }
 
         // Create a panel at runtime, move non-menu controls into it (preserve relative positions)
         // and arrange to keep it centered horizontally and vertically (below the menu strip).
@@ -168,6 +192,33 @@ namespace 密码生成器_WinForm
             y = Math.Max(menuBottom, y);
 
             centerPanel.Location = new System.Drawing.Point(x, y);
+
+            // Ensure each child control inside centerPanel is horizontally centered within the panel
+            try
+            {
+                foreach (Control c in centerPanel.Controls)
+                {
+                    try
+                    {
+                        // skip toolstrips or non-visual helpers
+                        if (c is ToolStrip) continue;
+                        // don't override the special copy button positioning (it should stay bottom-right of richTbx_Pwd)
+                        if (string.Equals(c.Name, "btn_CopyPwd", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (!c.Visible) continue;
+
+                        int newLeft = (centerPanel.Width - c.Width) / 2;
+                        c.Left = Math.Max(0, newLeft);
+                    }
+                    catch
+                    {
+                        // ignore per-control failures
+                    }
+                }
+            }
+            catch
+            {
+                // ignore
+            }
         }
 
         // Ensure dark title bar is applied whenever the window handle is created/recreated
@@ -501,5 +552,191 @@ namespace 密码生成器_WinForm
                 }
             }
         }
+
+        // Create a small copy button positioned at the bottom-right of richTbx_Pwd
+        private void CreateRichTextCopyButton()
+        {
+            try
+            {
+                // remove existing if any
+                if (btn_CopyPwd != null)
+                {
+                    btn_CopyPwd.Dispose();
+                    btn_CopyPwd = null;
+                }
+
+                if (richTbx_Pwd == null) return;
+                var parent = richTbx_Pwd.Parent;
+                if (parent == null) return;
+
+                btn_CopyPwd = new Sunny.UI.UIButton();
+                btn_CopyPwd.Name = "btn_CopyPwd";
+                btn_CopyPwd.Text = "复制";
+                btn_CopyPwd.Font = new Font("微软雅黑", 10F, FontStyle.Regular);
+                btn_CopyPwd.Size = new Size(75, 40);
+                btn_CopyPwd.TabStop = false;
+                btn_CopyPwd.ZoomScaleRect = new Rectangle(0, 0, 0, 0);
+                btn_CopyPwd.FillColor = Color.FromArgb(60, 80, 175);
+                btn_CopyPwd.ForeColor = Color.White;
+
+                // position relative to richTbx_Pwd inside the same parent
+                void Position()
+                {
+                    try
+                    {
+                        if (richTbx_Pwd == null || btn_CopyPwd == null) return;
+                        var loc = richTbx_Pwd.Location;
+                        int margin = 8;
+                        int x = loc.X + Math.Max(0, richTbx_Pwd.Width - btn_CopyPwd.Width - margin);
+                        int y = loc.Y + Math.Max(0, richTbx_Pwd.Height - btn_CopyPwd.Height - margin);
+                        btn_CopyPwd.Location = new Point(x, y);
+                        btn_CopyPwd.BringToFront();
+                    }
+                    catch { }
+                }
+
+                // click copies trimmed text
+                btn_CopyPwd.Click += (s, e) =>
+                {
+                    try
+                    {
+                        // ensure tooltip exists and is owner-drawn for custom background
+                        if (_copyToolTip == null)
+                        {
+                            _copyToolTip = new System.Windows.Forms.ToolTip();
+                            _copyToolTip.ShowAlways = true;
+                            _copyToolTip.AutoPopDelay = 2000;
+                            _copyToolTip.InitialDelay = 0;
+                            _copyToolTip.ReshowDelay = 0;
+                            _copyToolTip.OwnerDraw = true;
+
+                            // Popup: calculate size based on the last text
+                            _copyToolTip.Popup += (s2, pe) =>
+                            {
+                                try
+                                {
+                                    var txt = _lastCopyToolTipText ?? string.Empty;
+                                    var size = System.Windows.Forms.TextRenderer.MeasureText(txt, this.Font);
+                                    // add some padding
+                                    pe.ToolTipSize = new Size(size.Width + 12, size.Height + 8);
+                                }
+                                catch
+                                {
+                                    // ignore
+                                }
+                            };
+
+                            // Draw: paint background with custom color and draw centered text
+                            _copyToolTip.Draw += (s2, de) =>
+                            {
+                                try
+                                {
+                                    using (var b = new SolidBrush(_copyToolTipBackColor))
+                                    {
+                                        de.Graphics.FillRectangle(b, de.Bounds);
+                                    }
+                                    using (var p = new Pen(ControlPaint.Light(_copyToolTipBackColor, 10)))
+                                    {
+                                        var r = new Rectangle(de.Bounds.X, de.Bounds.Y, de.Bounds.Width - 1, de.Bounds.Height - 1);
+                                        de.Graphics.DrawRectangle(p, r);
+                                    }
+                                    // draw text centered
+                                    TextFormatFlags flags = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter;
+                                    TextRenderer.DrawText(de.Graphics, de.ToolTipText, this.Font, de.Bounds, _copyToolTipForeColor, flags);
+                                }
+                                catch
+                                {
+                                }
+                            };
+                        }
+
+                        string text = richTbx_Pwd?.Text?.Trim() ?? string.Empty;
+                        if (string.IsNullOrEmpty(text))
+                        {
+                            var msg = "文本为空";
+                            _lastCopyToolTipText = msg;
+                            var size = System.Windows.Forms.TextRenderer.MeasureText(msg, this.Font);
+                            int x = Math.Max(0, richTbx_Pwd.Width / 2 - size.Width / 2);
+                            int y = richTbx_Pwd.Height + 6;
+                            _copyToolTip.Show(msg, richTbx_Pwd, x, y, 1500);
+                            return;
+                        }
+
+                        System.Windows.Forms.Clipboard.SetText(text);
+                        {
+                            var msg = "已复制到剪贴板";
+                            _lastCopyToolTipText = msg;
+                            var size = System.Windows.Forms.TextRenderer.MeasureText(msg, this.Font);
+                            int x = Math.Max(0, richTbx_Pwd.Width / 2 - size.Width / 2);
+                            int y = richTbx_Pwd.Height + 6;
+                            _copyToolTip.Show(msg, richTbx_Pwd, x, y, 1500);
+                        }
+                    }
+                    catch
+                    {
+                        try
+                        {
+                            var msg = "复制失败。";
+                            _lastCopyToolTipText = msg;
+                            var size = System.Windows.Forms.TextRenderer.MeasureText(msg, this.Font);
+                            int x = Math.Max(0, richTbx_Pwd.Width / 2 - size.Width / 2);
+                            int y = richTbx_Pwd.Height + 6;
+                            _copyToolTip?.Show(msg, richTbx_Pwd, x, y, 1500);
+                        }
+                        catch
+                        {
+                        }
+                    }
+                 };
+
+                parent.Controls.Add(btn_CopyPwd);
+                Position();
+
+                // keep the copy button positioned if rich box moves or resizes
+                richTbx_Pwd.LocationChanged += (s, e) => Position();
+                richTbx_Pwd.SizeChanged += (s, e) => Position();
+                this.Resize += (s, e) => Position();
+            }
+            catch
+            {
+            }
+        }
+
+        // remove focus from richTbx_Pwd to avoid caret showing
+        private void RemoveRichFocus()
+        {
+            try
+            {
+                if (richTbx_Pwd == null) return;
+
+                // Prefer to move focus to a visible, safe control (generate button). If not available, give focus to the form.
+                try
+                {
+                    if (btn_GetPwd != null && btn_GetPwd.CanFocus)
+                    {
+                        btn_GetPwd.Focus();
+                    }
+                    else
+                    {
+                        this.ActiveControl = null;
+                        this.Focus();
+                    }
+                }
+                catch
+                {
+                }
+
+                // Hide caret in case the rich text box still has focus briefly
+                try { HideCaret(richTbx_Pwd.Handle); } catch { }
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
+        // P/Invoke to hide the caret explicitly
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool HideCaret(IntPtr hWnd);
     }
 }

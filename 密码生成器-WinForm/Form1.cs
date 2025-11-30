@@ -8,6 +8,9 @@ namespace 密码生成器_WinForm
     {
         private PwdType pwdType = PwdType.All;
 
+        // container used to keep all main controls centered together
+        private System.Windows.Forms.Panel? centerPanel;
+
         public Form1()
         {
             InitializeComponent();
@@ -16,6 +19,7 @@ namespace 密码生成器_WinForm
 
         private void CustomInitialize()
         {
+            this.ClientSize = new Size(900, 675);
             trackBar_PwdBits.ValueChanged += SavePasswordLength;
             cbx_Letters.CheckedChanged += PwdTypeSelect;
             cbx_Digits.CheckedChanged += PwdTypeSelect;
@@ -72,7 +76,98 @@ namespace 密码生成器_WinForm
                     }
                 }
             }
-            catch { }
+            catch
+            {
+            }
+
+            // 运行时设置：允许用户调整窗口大小，并设置一个最小尺寸以防界面布局被压缩
+            // 说明：我选择了 1024x600 作为最小窗口尺寸（可根据需要调整）。
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.Sizable;
+            this.MaximizeBox = true;
+            this.MinimumSize = new System.Drawing.Size(750, 675);
+
+            // 将界面控件包装到一个容器中以便在窗体缩放时整体居中
+            SetupCentering();
+        }
+
+        // Create a panel at runtime, move non-menu controls into it (preserve relative positions)
+        // and arrange to keep it centered horizontally and vertically (below the menu strip).
+        private void SetupCentering()
+        {
+            // Avoid multiple setups
+            if (centerPanel != null) return;
+
+            // Collect controls to move (exclude menuStrip_Main and any ToolStrip-derived controls)
+            var moveList = new List<Control>();
+            foreach (Control c in this.Controls)
+            {
+                if (c == this.menuStrip_Main) continue;
+                if (c is ToolStrip) continue;
+                moveList.Add(c);
+            }
+
+            if (moveList.Count == 0) return;
+
+            // Compute bounding rectangle of the controls to move
+            int minX = int.MaxValue, minY = int.MaxValue, maxRight = int.MinValue, maxBottom = int.MinValue;
+            foreach (var c in moveList)
+            {
+                minX = Math.Min(minX, c.Left);
+                minY = Math.Min(minY, c.Top);
+                maxRight = Math.Max(maxRight, c.Right);
+                maxBottom = Math.Max(maxBottom, c.Bottom);
+            }
+
+            const int padding = 8; // small padding inside the panel
+            int panelWidth = Math.Max(1, (maxRight - minX) + padding * 2);
+            int panelHeight = Math.Max(1, (maxBottom - minY) + padding * 2);
+
+            centerPanel = new System.Windows.Forms.Panel();
+            centerPanel.Name = "centerPanel";
+            centerPanel.Size = new System.Drawing.Size(panelWidth, panelHeight);
+            centerPanel.BackColor = this.BackColor; // match form background
+            centerPanel.Anchor = AnchorStyles.None;
+            centerPanel.TabIndex = 999; // keep behind other tab indices
+
+            // Add panel to Controls first so reparenting child controls won't remove it
+            this.Controls.Add(centerPanel);
+
+            // Move each control into centerPanel and adjust its location to be relative to panel
+            foreach (var c in moveList.ToArray())
+            {
+                // record old location relative to form
+                var oldLoc = c.Location;
+                // remove from form and add to panel
+                this.Controls.Remove(c);
+                centerPanel.Controls.Add(c);
+                // new location relative to panel (preserve layout)
+                c.Location = new System.Drawing.Point(oldLoc.X - minX + padding, oldLoc.Y - minY + padding);
+            }
+
+            // Center initially and on resize
+            this.Resize += (_, _) => CenterControls();
+            this.Shown += (_, _) => CenterControls();
+
+            CenterControls();
+        }
+
+        // Center the centerPanel within the form's client area, below the menu strip if present
+        private void CenterControls()
+        {
+            if (centerPanel == null) return;
+
+            int menuBottom = (this.menuStrip_Main != null) ? this.menuStrip_Main.Bottom : 0;
+            int availWidth = this.ClientSize.Width;
+            int availHeight = Math.Max(0, this.ClientSize.Height - menuBottom);
+
+            int x = (availWidth - centerPanel.Width) / 2;
+            int y = menuBottom + (availHeight - centerPanel.Height) / 2;
+
+            // clamp to non-negative
+            x = Math.Max(0, x);
+            y = Math.Max(menuBottom, y);
+
+            centerPanel.Location = new System.Drawing.Point(x, y);
         }
 
         // Ensure dark title bar is applied whenever the window handle is created/recreated
@@ -98,7 +193,13 @@ namespace 密码生成器_WinForm
             {
                 var p = type.GetProperty(propName);
                 if (p == null || !p.CanWrite) return;
-                try { p.SetValue(t, val); } catch { }
+                try
+                {
+                    p.SetValue(t, val);
+                }
+                catch
+                {
+                }
             }
 
             // common property names in SunnyUI controls
@@ -120,7 +221,9 @@ namespace 密码生成器_WinForm
                 var enumVal = System.Enum.Parse(enumType, "Custom");
                 pStyle.SetValue(t, enumVal);
             }
-            catch { }
+            catch
+            {
+            }
         }
 
         // Try to set common SunnyUI border-like properties via reflection. Many Sunny.UI controls expose properties
@@ -130,20 +233,35 @@ namespace 密码生成器_WinForm
             if (control == null) return;
             var type = control.GetType();
 
-            string[] names = new[] { "RectColor", "BorderColor", "RectBackColor", "RectInnerColor", "RectColor2", "FrameColor", "LineColor" };
+            string[] names = new[]
+            {
+                "RectColor", "BorderColor", "RectBackColor", "RectInnerColor", "RectColor2", "FrameColor", "LineColor"
+            };
 
             foreach (var name in names)
             {
                 var p = type.GetProperty(name);
                 if (p == null || !p.CanWrite) continue;
-                try { p.SetValue(control, color); } catch { }
+                try
+                {
+                    p.SetValue(control, color);
+                }
+                catch
+                {
+                }
             }
 
             // try common property for standard WinForms controls
             var pBorderStyle = type.GetProperty("BorderStyle");
             if (pBorderStyle != null && pBorderStyle.CanWrite)
             {
-                try { pBorderStyle.SetValue(control, System.Windows.Forms.BorderStyle.FixedSingle); } catch { }
+                try
+                {
+                    pBorderStyle.SetValue(control, System.Windows.Forms.BorderStyle.FixedSingle);
+                }
+                catch
+                {
+                }
             }
         }
 
@@ -233,10 +351,12 @@ namespace 密码生成器_WinForm
                 const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
                 const int DWMWA_USE_IMMERSIVE_DARK_MODE_OLD = 19;
 
-                int hr = DwmSetWindowAttribute(handle, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useDark, Marshal.SizeOf(useDark));
+                int hr = DwmSetWindowAttribute(handle, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useDark,
+                    Marshal.SizeOf(useDark));
                 if (hr != 0)
                 {
-                    DwmSetWindowAttribute(handle, DWMWA_USE_IMMERSIVE_DARK_MODE_OLD, ref useDark, Marshal.SizeOf(useDark));
+                    DwmSetWindowAttribute(handle, DWMWA_USE_IMMERSIVE_DARK_MODE_OLD, ref useDark,
+                        Marshal.SizeOf(useDark));
                 }
             }
             catch
@@ -347,10 +467,37 @@ namespace 密码生成器_WinForm
                 finally
                 {
                     // 确保释放字体和画刷资源
-                    try { numberFont.Dispose(); } catch { }
-                    try { prefixFont.Dispose(); } catch { }
-                    try { prefixBrush.Dispose(); } catch { }
-                    try { numberBrush.Dispose(); } catch { }
+                    try
+                    {
+                        numberFont.Dispose();
+                    }
+                    catch
+                    {
+                    }
+
+                    try
+                    {
+                        prefixFont.Dispose();
+                    }
+                    catch
+                    {
+                    }
+
+                    try
+                    {
+                        prefixBrush.Dispose();
+                    }
+                    catch
+                    {
+                    }
+
+                    try
+                    {
+                        numberBrush.Dispose();
+                    }
+                    catch
+                    {
+                    }
                 }
             }
         }

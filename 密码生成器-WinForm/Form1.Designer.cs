@@ -237,14 +237,14 @@
         private Sunny.UI.UIButton btn_GetPwd;
         private Sunny.UI.UIRichTextBox richTbx_Pwd;
         private CustomTrackBar trackBar_PwdBits;
-         private Sunny.UI.UILabel lb_PwdBits;
-         private ModernCheckBox cbx_Letters;
-         private ModernCheckBox cbx_Digits;
-         private ModernCheckBox cbx_Symbols;
-         private System.Windows.Forms.FlowLayoutPanel flowLayoutPanel_Checks;
-         private MenuStrip menuStrip_Main;
-         private ToolStripMenuItem M1_Help;
-         private ToolStripMenuItem M2_About;
-         private ToolStripMenuItem M2_Guide;
-     }
- }
+        private Sunny.UI.UILabel lb_PwdBits;
+        private ModernCheckBox cbx_Letters;
+        private ModernCheckBox cbx_Digits;
+        private ModernCheckBox cbx_Symbols;
+        private System.Windows.Forms.FlowLayoutPanel flowLayoutPanel_Checks;
+        private MenuStrip menuStrip_Main;
+        private ToolStripMenuItem M1_Help;
+        private ToolStripMenuItem M2_About;
+        private ToolStripMenuItem M2_Guide;
+    }
+}
